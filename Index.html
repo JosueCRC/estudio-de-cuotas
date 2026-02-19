@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analizador de Cuotas XML - Profesional</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.27/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        :root { --sidebar-width: 320px; --header-height: 70px; }
+        body { background-color: #f0f2f5; font-family: 'Segoe UI', Tahoma, sans-serif; overflow-x: hidden; }
+
+        .top-navbar {
+            height: var(--header-height); background: white;
+            display: flex; align-items: center; padding: 0 25px;
+            border-bottom: 1px solid #ddd; position: fixed; top: 0; width: 100%; z-index: 1040;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width); position: fixed; top: var(--header-height); left: 0; bottom: 0;
+            background: white; border-right: 1px solid #ddd; padding: 20px; z-index: 1030; overflow-y: auto;
+        }
+
+        .modal { z-index: 2100 !important; }
+        .modal-backdrop { z-index: 2090 !important; }
+
+        .main-content { margin-left: var(--sidebar-width); margin-top: var(--header-height); padding: 25px; }
+
+        .table-container { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        #outputTable { width: 100%; border-collapse: collapse; table-layout: fixed !important; }
+
+        #outputTable thead th {
+            position: sticky; top: 70px; background: #343a40 !important; color: white;
+            z-index: 1000; padding: 12px 8px; font-size: 0.8rem;
+        }
+
+        .w-cod { width: 135px; }
+        .w-desc { width: auto; }
+        .w-num { width: 85px; }
+
+        #outputTable td { 
+            border-bottom: 1px solid #eee; padding: 10px 8px; font-size: 0.82rem;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        .row-link { cursor: pointer; }
+        .row-link:hover { background-color: #f8fbff !important; }
+
+        .group-header td {
+            position: sticky; top: 112px; background: #e9ecef !important;
+            font-weight: bold; z-index: 900; color: #495057; border-left: 5px solid #007bff;
+        }
+
+        .modal-stat-card {
+            background: #fff; border: 1px solid #e9ecef; border-radius: 8px;
+            padding: 10px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 100%;
+        }
+        .modal-stat-card h6 { font-size: 0.75rem; color: #6c757d; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .modal-stat-card h4 { font-size: 1.25rem; margin-bottom: 0; font-weight: bold; }
+
+        .report-section { background: #f8f9fa; border-radius: 8px; padding: 15px; margin-bottom: 15px; border: 1px solid #e9ecef; }
+        
+        .justificacion-box { 
+            background: #fff; border: 1px dashed #007bff; padding: 18px; 
+            font-size: 0.9rem; color: #333; line-height: 1.6; 
+            white-space: pre-wrap; font-family: 'Courier New', Courier, monospace;
+        }
+
+        .stat-card-main { background: white; flex: 1; padding: 15px; border-radius: 8px; text-align: center; border-top: 5px solid #ddd; cursor: pointer; transition: transform 0.2s; }
+        .stat-card-main:hover { transform: translateY(-3px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .order-panel { background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 15px; display: flex; align-items: center; gap: 15px; }
+        
+        .low-consumption { color: #dc3545; font-weight: bold; }
+        .status-warning { color: #fd7e14; font-weight: bold; }
+
+        /* Estilo para la barra de progreso múltiple */
+        .main-progress-container { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd; }
+        .progress { height: 25px; border-radius: 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="modal fade" id="gestionModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="fas fa-file-signature"></i> Análisis Técnico de Gestión</h5>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="top-navbar">
+    <h4 class="mb-0">Analizador de Cuotas XML <img src="https://i.postimg.cc/x846QM5r/iconmonstr-flower-4-240.png" width="22"></h4>
+    <div class="ml-auto">
+        <button class="btn btn-success btn-sm" onclick="exportToPDF()"><i class="fas fa-file-pdf"></i> Exportar PDF</button>
+    </div>
+</div>
+
+<div class="sidebar">
+    <h6><i class="fas fa-filter"></i> Filtros de Control</h6>
+    <input type="text" id="searchInput" class="form-control mb-2" placeholder="Buscar producto..." onkeyup="searchTable()">
+    <select id="filterSelect" class="form-control mb-4" onchange="searchTable()">
+        <option value="all">Ver Todos</option>
+        <option value="red">Excesos (Crítico)</option>
+        <option value="orange">Alertas (Riesgo)</option>
+    </select>
+    <hr>
+    <h6><i class="fas fa-upload"></i> Carga de XML</h6>
+    <input type="file" id="f0" class="mb-1 small d-block">
+    <input type="file" id="f1" class="mb-1 small d-block">
+    <input type="file" id="f2" class="mb-1 small d-block">
+    <input type="file" id="f3" class="mb-3 small d-block">
+    <button class="btn btn-primary btn-block" onclick="analyzeFiles()"><b>PROCESAR ANALISIS</b></button>
+</div>
+
+<div class="main-content">
+
+    <div class="main-progress-container">
+        <div class="d-flex justify-content-between mb-2">
+            <span class="small font-weight-bold text-muted">DISTRIBUCIÓN DEL ESTADO DE INVENTARIO</span>
+            <span id="labelTotalItems" class="badge badge-secondary p-2">0 Ítems totales</span>
+        </div>
+        <div class="progress shadow-sm">
+            <div id="barExceso" class="progress-bar bg-danger" role="progressbar" style="width: 0%" title="Excesos">0%</div>
+            <div id="barAlerta" class="progress-bar bg-warning text-dark" role="progressbar" style="width: 0%" title="Alertas">0%</div>
+            <div id="barNormal" class="progress-bar bg-success" role="progressbar" style="width: 0%" title="Sin Novedad">0%</div>
+        </div>
+    </div>
+
+    <div class="d-flex mb-4" style="gap:15px">
+        <div class="stat-card-main" style="border-top-color: #dc3545" onclick="aplicarFiltroRapido('red')">
+            <h6>Excesos</h6>
+            <span id="resumenExceso" class="h4 text-danger">0</span>
+        </div>
+        <div class="stat-card-main" style="border-top-color: #fd7e14" onclick="aplicarFiltroRapido('orange')">
+            <h6>Alertas</h6>
+            <span id="resumenAlerta" class="h4 text-warning">0</span>
+        </div>
+        <div class="stat-card-main" style="border-top-color: #6f42c1">
+            <h6>Atención Requerida</h6>
+            <span id="porcentajeAtencion" class="h4" style="color: #6f42c1">0%</span>
+        </div>
+        <div class="stat-card-main" style="border-top-color: #28a745" onclick="aplicarFiltroRapido('all')">
+            <h6>Total Ítems</h6>
+            <span id="totalLineas" class="h4 text-success">0</span>
+        </div>
+    </div>
+
+    <div class="order-panel">
+        <span class="small font-weight-bold text-muted">ORDENAR INTERNO POR:</span>
+        <button class="btn btn-outline-info btn-sm" onclick="displayData(globalData, 'medio')">Dígitos Medios (-XX-)</button>
+        <button class="btn btn-outline-info btn-sm" onclick="displayData(globalData, 'final')">Últimos 4 Dígitos</button>
+        <span class="ml-auto badge badge-light border p-2">Grupo Fijo: Primeros 3 dígitos</span>
+    </div>
+
+    <div class="table-container">
+        <table class="table table-hover table-sm mb-0" id="outputTable">
+            <thead>
+                <tr>
+                    <th class="w-cod">Código</th>
+                    <th class="w-desc">Descripción</th>
+                    <th class="w-num text-right">Cuota</th>
+                    <th class="w-num text-right">M1</th>
+                    <th class="w-num text-right">M2</th>
+                    <th class="w-num text-right">M3</th>
+                    <th class="w-num text-right">Prom.</th>
+                    <th class="w-num text-right" style="background: #2c3e50 !important;">Nec. 1.5</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let globalData = {};
+
+    function aplicarFiltroRapido(v) { document.getElementById('filterSelect').value = v; searchTable(); }
+
+    function analyzeFiles() {
+        const files = [document.getElementById('f0').files[0], document.getElementById('f1').files[0], document.getElementById('f2').files[0], document.getElementById('f3').files[0]];
+        if (files.some(f => !f)) return alert("Por favor, cargue los 4 archivos solicitados.");
+        const data = {}; let loaded = 0;
+        files.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const xml = new DOMParser().parseFromString(e.target.result, "text/xml");
+                xml.querySelectorAll("FormattedReportObjects").forEach(report => {
+                    const code = report.querySelector("FormattedReportObject[FieldName*='CODIGO'] Value")?.textContent.trim() || "N/A";
+                    const product = report.querySelector("FormattedReportObject[FieldName*='DSC_PRODUCTO'] Value")?.textContent.trim() || "N/A";
+                    const unit = report.querySelector("FormattedReportObject[FieldName*='COD_UNIDAD_MEDIDA'] Value")?.textContent.trim() || "N/A";
+                    const field = (index === 0) ? "CAN_CUOTA" : "CAN_PRODUCTO";
+                    const val = parseFloat(report.querySelector(`FormattedReportObject[FieldName*='${field}'] Value`)?.textContent || "0");
+                    if (!data[code]) data[code] = { product, unit, cuota: 0, m: [0,0,0] };
+                    if (index === 0) data[code].cuota = val; else data[code].m[index-1] = val;
+                });
+                if (++loaded === 4) { globalData = data; displayData(data, 'medio'); }
+            };
+            reader.readAsText(file);
+        });
+    }
+
+    function displayData(data, tipoOrden) {
+        const tbody = document.querySelector('#outputTable tbody');
+        tbody.innerHTML = ''; let exc = 0, alr = 0, normal = 0;
+        
+        const sortedCodes = Object.keys(data).sort((a, b) => {
+            const prefA = a.substring(0, 3);
+            const prefB = b.substring(0, 3);
+            if (prefA !== prefB) return prefA.localeCompare(prefB, undefined, {numeric: true});
+            
+            if (tipoOrden === 'medio') {
+                const medioA = a.split('-')[1] || "";
+                const medioB = b.split('-')[1] || "";
+                return medioA.localeCompare(medioB, undefined, {numeric: true}) || a.localeCompare(b);
+            } else {
+                const finA = a.slice(-4);
+                const finB = b.slice(-4);
+                return finA.localeCompare(finB, undefined, {numeric: true}) || a.localeCompare(b);
+            }
+        });
+
+        let lastPref = "";
+        sortedCodes.forEach(code => {
+            const r = data[code];
+            const avg = (r.m.reduce((a, b) => a + b, 0) / 3);
+            const nec = (avg * 1.5).toFixed(2);
+            const currentPref = code.substring(0, 3);
+            
+            if (currentPref !== lastPref) {
+                const hRow = tbody.insertRow(); hRow.className = "group-header";
+                hRow.innerHTML = `<td colspan="8"><i class="fas fa-boxes"></i> Familia: ${currentPref}</td>`;
+                lastPref = currentPref;
+            }
+
+            const isExceso = avg > r.cuota;
+            const isAlerta = !isExceso && (avg >= r.cuota * 0.85);
+            const stClass = isExceso ? "low-consumption" : (isAlerta ? "status-warning" : "");
+            
+            if (isExceso) exc++; else if (isAlerta) alr++; else normal++;
+
+            const row = tbody.insertRow(); row.className = "row-link"; row.onclick = () => abrirGestion(code);
+            row.innerHTML = `<td>${code}</td><td><b>${r.product}</b></td><td class="text-right">${r.cuota}</td><td class="text-right">${r.m[0]}</td><td class="text-right">${r.m[1]}</td><td class="text-right">${r.m[2]}</td><td class="text-right ${stClass}">${avg.toFixed(2)}</td><td class="text-right font-weight-bold">${nec}</td>`;
+        });
+
+        // Cálculos de métricas
+        const total = sortedCodes.length;
+        const requiereAtencion = exc + alr;
+        const porcAtencion = total > 0 ? ((requiereAtencion / total) * 100).toFixed(1) : 0;
+        
+        // Cálculos para la barra múltiple
+        const pExc = total > 0 ? ((exc / total) * 100).toFixed(1) : 0;
+        const pAlr = total > 0 ? ((alr / total) * 100).toFixed(1) : 0;
+        const pNor = total > 0 ? ((normal / total) * 100).toFixed(1) : 0;
+
+        // Actualización de Tableros (Cards)
+        document.getElementById("resumenExceso").innerText = exc;
+        document.getElementById("resumenAlerta").innerText = alr;
+        document.getElementById("totalLineas").innerText = total;
+        document.getElementById("porcentajeAtencion").innerText = porcAtencion + "%";
+
+        // Actualización de Barra de Progreso Múltiple
+        document.getElementById("labelTotalItems").innerText = total + " Ítems totales";
+        
+        const bExc = document.getElementById("barExceso");
+        bExc.style.width = pExc + "%";
+        bExc.innerText = pExc > 5 ? pExc + "% Exceso" : "";
+        
+        const bAlr = document.getElementById("barAlerta");
+        bAlr.style.width = pAlr + "%";
+        bAlr.innerText = pAlr > 5 ? pAlr + "% Alerta" : "";
+        
+        const bNor = document.getElementById("barNormal");
+        bNor.style.width = pNor + "%";
+        bNor.innerText = pNor > 5 ? pNor + "% Normal" : "";
+
+        searchTable();
+    }
+
+    function abrirGestion(code) {
+        const r = globalData[code]; 
+        const avg = (r.m.reduce((a, b) => a + b, 0) / 3);
+        const nec = (avg * 1.5).toFixed(2);
+        const vigencia = avg > 0 ? (r.cuota / (avg / 30)).toFixed(0) : "∞";
+        const porcentaje = ((avg / r.cuota) * 100).toFixed(1);
+
+        const esAumento = avg > r.cuota;
+        const colorClase = esAumento ? 'text-danger' : 'text-success';
+        const tituloAccion = esAumento ? 'SOLICITUD DE AMPLIACIÓN DE CUOTA' : 'SOLICITUD DE REDUCCIÓN / AJUSTE DE CUOTA';
+        const verboPropuesta = esAumento ? 'una ampliación' : 'un ajuste a la baja';
+        const riesgoTexto = esAumento 
+            ? `comprometiendo la continuidad del proceso por agotamiento temprano de la asignación.` 
+            : `detectándose un excedente de cuota que permite optimizar la asignación según la demanda real.`;
+
+        const justificante = `${tituloAccion}\n\n` +
+            `PRODUCTO: ${r.product}\n` +
+            `CÓDIGO DE IDENTIFICACIÓN: ${code}\n\n` +
+            `I. ANTECEDENTES:\n` +
+            `El producto cuenta con una cuota mensual de ${r.cuota} ${r.unit}. El análisis del último trimestre registra consumos de ${r.m[0]}, ${r.m[1]} y ${r.m[2]} unidades, resultando en un promedio mensual real de ${avg.toFixed(2)}.\n\n` +
+            `II. ANÁLISIS OPERATIVO:\n` +
+            `El consumo real representa el ${porcentaje}% de la cuota disponible. Bajo esta tendencia, la cobertura teórica es de ${vigencia} días mensuales, ${riesgoTexto}\n\n` +
+            `III. PROPUESTA TÉCNICA:\n` +
+            `Se requiere ${verboPropuesta} de la cuota basada en el factor de seguridad de 1.5 meses sobre el promedio real, estableciendo un nuevo requerimiento de ${nec} ${r.unit}.`;
+
+        document.getElementById('modalBody').innerHTML = `
+            <div class="report-section mb-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">PRODUCTO SELECCIONADO</h6>
+                        <h4 class="text-primary mb-0">${r.product}</h4>
+                        <small>ID: <b>${code}</b> | Unidad: <b>${r.unit}</b></small>
+                    </div>
+                    <div class="text-right">
+                        <span class="badge ${esAumento ? 'badge-danger' : 'badge-success'} p-2" style="font-size:0.9rem">
+                            <i class="fas ${esAumento ? 'fa-arrow-up' : 'fa-arrow-down'}"></i> ${esAumento ? 'AUMENTAR' : 'REDUCIR'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-2 mb-2">
+                    <div class="modal-stat-card">
+                        <h6>CUOTA ACTUAL</h6>
+                        <h4>${r.cuota}</h4>
+                    </div>
+                </div>
+                <div class="col-md-2 mb-2">
+                    <div class="modal-stat-card">
+                        <h6>PROM. MENSUAL</h6>
+                        <h4>${avg.toFixed(2)}</h4>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <div class="modal-stat-card border-primary" style="background: #f0f7ff;">
+                        <h6>NUEVA NECESIDAD (1.5)</h6>
+                        <h4 class="${colorClase}">${nec}</h4>
+                    </div>
+                </div>
+                <div class="col-md-2 mb-2">
+                    <div class="modal-stat-card">
+                        <h6>VIGENCIA ACTUAL</h6>
+                        <h4>${vigencia} d</h4>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <div class="modal-stat-card">
+                        <h6>USO DE CUOTA</h6>
+                        <h4>${porcentaje}%</h4>
+                    </div>
+                </div>
+            </div>
+
+            <div class="report-section bg-white border">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0"><i class="fas fa-file-alt"></i> JUSTIFICACIÓN TÉCNICA RECOMENDADA</h6>
+                    <button class="btn btn-sm btn-outline-primary" onclick="copyJ()"><i class="fas fa-copy"></i> Copiar Texto</button>
+                </div>
+                <div class="justificacion-box" id="jtext">${justificante}</div>
+            </div>`;
+        $('#gestionModal').modal('show');
+    }
+
+    function copyJ() { navigator.clipboard.writeText(document.getElementById('jtext').innerText); alert("Justificación copiada correctamente."); }
+
+    function searchTable() {
+        const txt = document.getElementById("searchInput").value.toLowerCase();
+        const filt = document.getElementById("filterSelect").value;
+        const rows = document.querySelectorAll("#outputTable tbody tr:not(.group-header)");
+        document.querySelectorAll(".group-header").forEach(h => h.style.display = "none");
+        rows.forEach(r => {
+            const isRed = r.querySelector('.low-consumption');
+            const isOr = r.querySelector('.status-warning');
+            const matchTxt = r.innerText.toLowerCase().includes(txt);
+            const matchFilt = (filt === "all") || (filt === "red" && isRed) || (filt === "orange" && isOr);
+            if (matchTxt && matchFilt) {
+                r.style.display = "";
+                let p = r.previousElementSibling;
+                while (p && !p.classList.contains('group-header')) p = p.previousElementSibling;
+                if (p) p.style.display = "";
+            } else r.style.display = "none";
+        });
+    }
+
+    function exportToPDF() {
+        const { jsPDF } = window.jspdf; const doc = new jsPDF('landscape');
+        doc.autoTable({ html: '#outputTable', theme: 'grid', styles: { fontSize: 7 } });
+        doc.save('Analisis_Cuotas_Completo.pdf');
+    }
+</script>
+</body>
+</html>
