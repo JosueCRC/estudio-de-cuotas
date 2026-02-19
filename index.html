@@ -28,15 +28,27 @@
         .low-consumption { color: #dc3545; font-weight: bold; }
         .status-warning { color: #fd7e14; font-weight: bold; }
         .main-progress-container { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd; }
+        
+        /* BARRA DE PROGRESO CORREGIDA */
         .progress { height: 28px; border-radius: 5px; font-weight: bold; font-size: 0.85rem; }
+        .progress-bar { 
+            transition: width 0.6s ease; 
+            line-height: 28px; 
+            color: white; 
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        .bg-warning { color: #212529 !important; text-shadow: none !important; } /* Texto oscuro para el amarillo */
+
         .stat-card-main { background: white; flex: 1; padding: 15px; border-radius: 8px; text-align: center; border-top: 5px solid #ddd; cursor: pointer; transition: transform 0.2s; }
         .stat-card-main:hover { transform: translateY(-3px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .justificacion-box { background: #fff; border: 1px dashed #007bff; padding: 18px; font-size: 0.9rem; color: #333; line-height: 1.6; white-space: pre-wrap; font-family: 'Courier New', Courier, monospace; }
-        
-        /* Estilo para el tablero de atención */
         .attention-panel { background: #fff; border-radius: 8px; padding: 15px; margin-bottom: 20px; border: 1px solid #ffccd5; }
         .attention-list { max-height: 200px; overflow-y: auto; }
-        .badge-fixed { width: 100px; display: inline-block; }
+        
+        /* Estilos adicionales para el modal */
+        .modal-stat-card { background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #dee2e6; text-align: center; }
+        .modal-stat-card h6 { font-size: 0.7rem; color: #6c757d; margin-bottom: 5px; text-transform: uppercase; }
+        .modal-stat-card h4 { margin-bottom: 0; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -110,9 +122,8 @@
     </div>
 
     <div class="attention-panel shadow-sm" id="panelAtencion" style="display:none;">
-        <h6 class="text-danger border-bottom pb-2"><i class="fas fa-exclamation-triangle"></i> PRODUCTOS QUE REQUIEREN ACCIÓN INMEDIATA</h6>
-        <div class="attention-list" id="listaAtencion">
-            </div>
+        <h6 class="text-danger border-bottom pb-2"><i class="fas fa-exclamation-triangle"></i> PRODUCTOS QUE REQUIEREN ACCIÓN INMEDIATA (TOP 10)</h6>
+        <div class="attention-list" id="listaAtencion"></div>
     </div>
 
     <div class="table-container">
@@ -153,12 +164,7 @@
                     const product = report.querySelector("FormattedReportObject[FieldName*='DSC_PRODUCTO'] Value")?.textContent.trim() || "N/A";
                     const unit = report.querySelector("FormattedReportObject[FieldName*='COD_UNIDAD_MEDIDA'] Value")?.textContent.trim() || "N/A";
                     
-                    let valNode;
-                    if (index === 0) {
-                        valNode = report.querySelector("FormattedReportObject[FieldName*='CAN_CUOTA'] Value");
-                    } else {
-                        valNode = report.querySelector("FormattedReportObject[FieldName*='CAN_PRODUCTO'] Value");
-                    }
+                    let valNode = (index === 0) ? report.querySelector("FormattedReportObject[FieldName*='CAN_CUOTA'] Value") : report.querySelector("FormattedReportObject[FieldName*='CAN_PRODUCTO'] Value");
                     const val = parseFloat(valNode?.textContent || "0");
 
                     if (!data[code]) data[code] = { product, unit, cuota: 0, m: [0,0,0] };
@@ -172,7 +178,7 @@
         });
     }
 
- function displayData(data) {
+    function displayData(data) {
         const tbody = document.querySelector('#outputTable tbody');
         const listaAt = document.getElementById('listaAtencion');
         tbody.innerHTML = ''; listaAt.innerHTML = '';
@@ -200,27 +206,39 @@
             row.innerHTML = `<td>${code}</td><td><b>${r.product}</b></td><td class="text-right">${r.cuota}</td><td class="text-right">${r.m[0]}</td><td class="text-right">${r.m[1]}</td><td class="text-right">${r.m[2]}</td><td class="text-right ${isExc?'low-consumption':(isAlr?'status-warning':'')}">${avg.toFixed(2)}</td><td class="text-right font-weight-bold text-primary">${nec}</td>`;
         });
 
-        // Lógica del Top 10
         criticos.sort((a,b) => b.util - a.util);
         criticos.slice(0,10).forEach(i => {
             listaAt.innerHTML += `<div style="display:flex; justify-content:space-between; font-size:0.85rem; padding:3px 0; border-bottom:1px solid #eee;">
-                <span><b>${i.code}</b> - ${i.product}</span>
+                <span><b>${i.code}</b> - ${i.product} (${(i.util*100).toFixed(1)}%)</span>
                 <span class="badge ${i.status==='EXCESO'?'badge-danger':'badge-warning'}">${i.status}</span>
             </div>`;
         });
         document.getElementById('panelAtencion').style.display = criticos.length > 0 ? 'block' : 'none';
 
         const total = sortedCodes.length;
+        
+        // CÁLCULO Y ACTUALIZACIÓN DE BARRA CON PORCENTAJES
+        const pExc = total > 0 ? ((exc / total) * 100).toFixed(1) : 0;
+        const pAlr = total > 0 ? ((alr / total) * 100).toFixed(1) : 0;
+        const pNor = total > 0 ? ((nor / total) * 100).toFixed(1) : 0;
+
+        const bE = document.getElementById("barExceso");
+        bE.style.width = pExc + "%"; bE.innerText = pExc > 5 ? pExc + "%" : "";
+        
+        const bA = document.getElementById("barAlerta");
+        bA.style.width = pAlr + "%"; bA.innerText = pAlr > 5 ? pAlr + "%" : "";
+        
+        const bN = document.getElementById("barNormal");
+        bN.style.width = pNor + "%"; bN.innerText = pNor > 5 ? pNor + "%" : "";
+
         document.getElementById("resumenExceso").innerText = exc;
         document.getElementById("resumenAlerta").innerText = alr;
         document.getElementById("totalLineas").innerText = total;
         document.getElementById("porcentajeAtencion").innerText = total > 0 ? ((exc+alr)/total*100).toFixed(1)+"%" : "0%";
-        document.getElementById("barExceso").style.width = (exc/total*100)+"%";
-        document.getElementById("barAlerta").style.width = (alr/total*100)+"%";
-        document.getElementById("barNormal").style.width = (nor/total*100)+"%";
         document.getElementById("labelTotalItems").innerText = total + " ítems";
         searchTable();
     }
+
     function searchTable() {
         const txt = document.getElementById("searchInput").value.toLowerCase();
         const filt = document.getElementById("filterSelect").value;
@@ -239,90 +257,39 @@
         });
     }
 
-   function abrirGestion(code) {
+    function abrirGestion(code) {
         const r = globalData[code]; 
         const avg = (r.m.reduce((a, b) => a + b, 0) / 3);
         const nec = (avg * 1.5).toFixed(2);
         const vigencia = avg > 0 ? (r.cuota / (avg / 30)).toFixed(0) : "∞";
-        const porcentaje = ((avg / r.cuota) * 100).toFixed(1);
+        const porcentaje = r.cuota > 0 ? ((avg / r.cuota) * 100).toFixed(1) : "0";
 
         const esAumento = avg > r.cuota;
         const colorClase = esAumento ? 'text-danger' : 'text-success';
         const tituloAccion = esAumento ? 'SOLICITUD DE AMPLIACIÓN DE CUOTA' : 'SOLICITUD DE REDUCCIÓN / AJUSTE DE CUOTA';
-        const verboPropuesta = esAumento ? 'una ampliación' : 'un ajuste a la baja';
-        const riesgoTexto = esAumento 
-            ? `comprometiendo la continuidad del proceso por agotamiento temprano de la asignación.` 
-            : `detectándose un excedente de cuota que permite optimizar la asignación según la demanda real.`;
-
-        const justificante = `${tituloAccion}\n\n` +
-            `PRODUCTO: ${r.product}\n` +
-            `CÓDIGO DE IDENTIFICACIÓN: ${code}\n\n` +
-            `I. ANTECEDENTES:\n` +
-            `El producto cuenta con una cuota mensual de ${r.cuota} ${r.unit}. El análisis del último trimestre registra consumos de ${r.m[0]}, ${r.m[1]} y ${r.m[2]} unidades, resultando en un promedio mensual real de ${avg.toFixed(2)}.\n\n` +
-            `II. ANÁLISIS OPERATIVO:\n` +
-            `El consumo real representa el ${porcentaje}% de la cuota disponible. Bajo esta tendencia, la cobertura teórica es de ${vigencia} días mensuales, ${riesgoTexto}\n\n` +
-            `III. PROPUESTA TÉCNICA:\n` +
-            `Se requiere ${verboPropuesta} de la cuota basada en el factor de seguridad de 1.5 meses sobre el promedio real, estableciendo un nuevo requerimiento de ${nec} ${r.unit}.`;
+        
+        const justificante = `${tituloAccion}\n\nPRODUCTO: ${r.product}\nID: ${code}\n\nI. ANTECEDENTES:\nCuota: ${r.cuota}. Consumos: ${r.m[0]}, ${r.m[1]}, ${r.m[2]}. Promedio: ${avg.toFixed(2)}.\n\nII. ANÁLISIS:\nUso: ${porcentaje}%. Cobertura: ${vigencia} días.\n\nIII. PROPUESTA:\nNueva cuota sugerida: ${nec} ${r.unit}.`;
 
         document.getElementById('modalBody').innerHTML = `
             <div class="report-section mb-3">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-muted mb-1">PRODUCTO SELECCIONADO</h6>
-                        <h4 class="text-primary mb-0">${r.product}</h4>
-                        <small>ID: <b>${code}</b> | Unidad: <b>${r.unit}</b></small>
-                    </div>
-                    <div class="text-right">
-                        <span class="badge ${esAumento ? 'badge-danger' : 'badge-success'} p-2" style="font-size:0.9rem">
-                            <i class="fas ${esAumento ? 'fa-arrow-up' : 'fa-arrow-down'}"></i> ${esAumento ? 'AUMENTAR' : 'REDUCIR'}
-                        </span>
-                    </div>
-                </div>
+                <h4 class="text-primary">${r.product}</h4>
+                <small>ID: <b>${code}</b> | Unidad: <b>${r.unit}</b></small>
             </div>
-
             <div class="row mb-4">
-                <div class="col-md-2 mb-2">
-                    <div class="modal-stat-card">
-                        <h6>CUOTA ACTUAL</h6>
-                        <h4>${r.cuota}</h4>
-                    </div>
-                </div>
-                <div class="col-md-2 mb-2">
-                    <div class="modal-stat-card">
-                        <h6>PROM. MENSUAL</h6>
-                        <h4>${avg.toFixed(2)}</h4>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-2">
-                    <div class="modal-stat-card border-primary" style="background: #f0f7ff;">
-                        <h6>NUEVA NECESIDAD (1.5)</h6>
-                        <h4 class="${colorClase}">${nec}</h4>
-                    </div>
-                </div>
-                <div class="col-md-2 mb-2">
-                    <div class="modal-stat-card">
-                        <h6>VIGENCIA ACTUAL</h6>
-                        <h4>${vigencia} d</h4>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-2">
-                    <div class="modal-stat-card">
-                        <h6>USO DE CUOTA</h6>
-                        <h4>${porcentaje}%</h4>
-                    </div>
-                </div>
+                <div class="col-md-3"><div class="modal-stat-card"><h6>CUOTA</h6><h4>${r.cuota}</h4></div></div>
+                <div class="col-md-3"><div class="modal-stat-card"><h6>PROM.</h6><h4>${avg.toFixed(2)}</h4></div></div>
+                <div class="col-md-3"><div class="modal-stat-card border-primary"><h6>NEC. 1.5</h6><h4 class="${colorClase}">${nec}</h4></div></div>
+                <div class="col-md-3"><div class="modal-stat-card"><h6>USO</h6><h4>${porcentaje}%</h4></div></div>
             </div>
-
-            <div class="report-section bg-white border">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="mb-0"><i class="fas fa-file-alt"></i> JUSTIFICACIÓN TÉCNICA RECOMENDADA</h6>
-                    <button class="btn btn-sm btn-outline-primary" onclick="copyJ()"><i class="fas fa-copy"></i> Copiar Texto</button>
+            <div class="report-section bg-white border p-3">
+                <div class="d-flex justify-content-between mb-2">
+                    <h6 class="mb-0">JUSTIFICACIÓN TÉCNICA</h6>
+                    <button class="btn btn-sm btn-outline-primary" onclick="copyJ()">Copiar</button>
                 </div>
                 <div class="justificacion-box" id="jtext">${justificante}</div>
             </div>`;
         $('#gestionModal').modal('show');
     }
-
 
     function copyJ() { navigator.clipboard.writeText(document.getElementById('jtext').innerText); alert("Copiado."); }
 
@@ -331,9 +298,9 @@
         const pdfRows = [];
         const rows = document.querySelectorAll("#outputTable tbody tr:not(.group-header)");
         rows.forEach(row => { if (row.style.display !== 'none') pdfRows.push(Array.from(row.cells).map(c => c.innerText)); });
-        doc.setFontSize(16); doc.text("Reporte de Análisis de Cuotas y Consumos", 14, 15);
-        doc.autoTable({ head: [['Código', 'Descripción', 'Cuota', 'M1', 'M2', 'M3', 'Prom.', 'Nec. 1.5']], body: pdfRows, startY: 25, theme: 'grid', styles: { fontSize: 7 }, headStyles: { fillColor: [40, 40, 40] } });
-        doc.save('Reporte_Analisis.pdf');
+        doc.text("Reporte de Análisis", 14, 15);
+        doc.autoTable({ head: [['Código', 'Descripción', 'Cuota', 'M1', 'M2', 'M3', 'Prom.', 'Nec. 1.5']], body: pdfRows, startY: 20 });
+        doc.save('Reporte.pdf');
     }
 </script>
 </body>
