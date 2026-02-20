@@ -49,6 +49,40 @@
         .modal-stat-card { background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #dee2e6; text-align: center; }
         .modal-stat-card h6 { font-size: 0.7rem; color: #6c757d; margin-bottom: 5px; text-transform: uppercase; }
         .modal-stat-card h4 { margin-bottom: 0; font-weight: bold; }
+
+
+        /* Contenedor de carga estilizado */
+.upload-group {
+    background: #f8f9fa;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+    transition: all 0.3s;
+    position: relative;
+    cursor: pointer;
+}
+
+.upload-group:hover {
+    border-color: #007bff;
+    background: #eef6ff;
+}
+
+.upload-group label {
+    display: block;
+    margin-bottom: 0;
+    cursor: pointer;
+    font-size: 0.75rem;
+    color: #495057;
+    font-weight: 600;
+}
+
+/* Ocultamos el input real pero mantenemos su funcionalidad */
+.upload-group input[type="file"] {
+    font-size: 0.7rem;
+    width: 100%;
+}
+
     </style>
 </head>
 <body>
@@ -85,10 +119,24 @@
     </select>
     <hr>
     <h6><i class="fas fa-upload"></i> Carga de XML</h6>
-    <input type="file" id="f0" class="mb-1 small d-block">
-    <input type="file" id="f1" class="mb-1 small d-block">
-    <input type="file" id="f2" class="mb-1 small d-block">
-    <input type="file" id="f3" class="mb-3 small d-block">
+    <div class="upload-group">
+        <label><i class="fas fa-file-code text-primary"></i> Archivo Cuotas (F0)</label>
+        <input type="file" id="f0" class="form-control-file">
+    </div>
+    <div class="upload-group">
+        <label><i class="fas fa-history text-info"></i> Consumo Mes 1 (F1)</label>
+        <input type="file" id="f1" class="form-control-file">
+    </div>
+
+    <div class="upload-group">
+        <label><i class="fas fa-history text-info"></i> Consumo Mes 2 (F2)</label>
+        <input type="file" id="f2" class="form-control-file">
+    </div>
+
+    <div class="upload-group">
+        <label><i class="fas fa-history text-info"></i> Consumo Mes 3 (F3)</label>
+        <input type="file" id="f3" class="form-control-file">
+    </div>
     <button class="btn btn-primary btn-block" onclick="analyzeFiles()"><b>PROCESAR ANALISIS</b></button>
 </div>
 
