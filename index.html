@@ -82,7 +82,19 @@
     font-size: 0.7rem;
     width: 100%;
 }
-
+/* Esto hará que tus inputs de archivo se vean como cajas de clic */
+input[type="file"] {
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    padding: 5px;
+    border-radius: 4px;
+    width: 100%;
+    cursor: pointer;
+}
+input[type="file"]:hover {
+    background: #e9ecef;
+    border-color: #007bff;
+}
     </style>
 </head>
 <body>
@@ -104,7 +116,11 @@
 
 <div class="top-navbar">
     <h4 class="mb-0">Analizador de Cuotas XML <img src="https://i.postimg.cc/x846QM5r/iconmonstr-flower-4-240.png" width="22"></h4>
+    
+
     <div class="ml-auto">
+        <button class="btn btn-danger btn-sm shadow-sm" onclick="exportarInformePDF()"><i class="fas fa-file-signature mr-2"></i> <b>Generar Informe</b></button>
+
         <button class="btn btn-success btn-sm" onclick="exportToPDF()"><i class="fas fa-file-pdf"></i> Exportar Reporte PDF</button>
     </div>
 </div>
@@ -138,6 +154,26 @@
         <input type="file" id="f3" class="form-control-file">
     </div>
     <button class="btn btn-primary btn-block" onclick="analyzeFiles()"><b>PROCESAR ANALISIS</b></button>
+     <hr>
+<div >
+    <div class="bg-white p-2 border rounded mb-3 d-flex align-items-center shadow-sm">
+    <span class="small font-weight-bold text-muted mr-3">ORDENAR POR:</span>
+    
+    <button class="btn btn-outline-info btn-sm mr-2" 
+            onclick="ordenarPorCriterio('medio')" 
+            title="Dígitos Medios (-XX-)">
+        <i class="fas fa-arrows-alt-h"></i>
+    </button>
+
+    <button class="btn btn-outline-info btn-sm" 
+            onclick="ordenarPorCriterio('final')" 
+            title="Últimos 4 Dígitos">
+        <i class="fas fa-sort-numeric-down"></i>
+    </button>
+</div>
+</div>
+
+    
 </div>
 
 <div class="main-content">
@@ -179,7 +215,7 @@
             <thead>
                 <tr>
                     <th class="w-cod">Código</th>
-                    <th class="w-desc">Descripción</th>
+                    <th class="w-desc">Descripción </th>
                     <th class="w-num text-right">Cuota</th>
                     <th class="w-num text-right">M1</th>
                     <th class="w-num text-right">M2</th>
@@ -192,7 +228,19 @@
         </table>
     </div>
 </div>
-
+<footer class="fixed-bottom bg-white border-top p-2 text-muted shadow-lg" style="margin-left: var(--sidebar-width); z-index: 1050;">
+    <div class="container-fluid">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <small><strong>Analizador de Cuotas</strong> &copy; 2026 | Desarrollado por <span class="text-primary">Josue Gonzalez Barrios</span></small>
+            </div>
+            <div class="col-md-6 text-right">
+                <span class="badge badge-pill badge-dark px-3">V 2.0</span>
+                <small class="ml-2 font-italic">Optimizado para Gestión de Inventarios</small>
+            </div>
+        </div>
+    </div>
+</footer>
 <script>
     let globalData = {};
 
@@ -233,10 +281,11 @@
         let exc = 0, alr = 0, nor = 0;
         let criticos = [];
 
-        const sortedCodes = Object.keys(data).sort((a,b) => a.localeCompare(b));
+        // No ordenamos aquí para respetar el orden que viene de la función de botones
+        const keysToUse = Object.keys(data);
         let lastPref = "";
 
-        sortedCodes.forEach(code => {
+        keysToUse.forEach(code => {
             const r = data[code], avg = (r.m.reduce((a,b) => a+b, 0)/3), nec = (avg*1.5).toFixed(2);
             const utilization = r.cuota > 0 ? (avg / r.cuota) : 0;
             const isExc = avg > r.cuota, isAlr = !isExc && (avg >= r.cuota*0.85);
@@ -263,19 +312,15 @@
         });
         document.getElementById('panelAtencion').style.display = criticos.length > 0 ? 'block' : 'none';
 
-        const total = sortedCodes.length;
-        
-        // CÁLCULO Y ACTUALIZACIÓN DE BARRA CON PORCENTAJES
+        const total = keysToUse.length;
         const pExc = total > 0 ? ((exc / total) * 100).toFixed(1) : 0;
         const pAlr = total > 0 ? ((alr / total) * 100).toFixed(1) : 0;
         const pNor = total > 0 ? ((nor / total) * 100).toFixed(1) : 0;
 
         const bE = document.getElementById("barExceso");
         bE.style.width = pExc + "%"; bE.innerText = pExc > 5 ? pExc + "%" : "";
-        
         const bA = document.getElementById("barAlerta");
         bA.style.width = pAlr + "%"; bA.innerText = pAlr > 5 ? pAlr + "%" : "";
-        
         const bN = document.getElementById("barNormal");
         bN.style.width = pNor + "%"; bN.innerText = pNor > 5 ? pNor + "%" : "";
 
@@ -388,6 +433,7 @@
             </div>`;
         $('#gestionModal').modal('show');
     }
+
     function copyJ() { navigator.clipboard.writeText(document.getElementById('jtext').innerText); alert("Copiado."); }
 
     function exportToPDF() {
@@ -399,6 +445,197 @@
         doc.autoTable({ head: [['Código', 'Descripción', 'Cuota', 'M1', 'M2', 'M3', 'Prom.', 'Nec. 1.5']], body: pdfRows, startY: 20 });
         doc.save('Reporte.pdf');
     }
+
+    function ordenarPorCriterio(criterio) {
+        if (!globalData || Object.keys(globalData).length === 0) {
+            alert("Primero procesa los archivos XML");
+            return;
+        }
+
+        const entries = Object.entries(globalData);
+
+        entries.sort((a, b) => {
+            const codA = a[0];
+            const codB = b[0];
+
+            // 1. SIEMPRE ORDENAR PRIMERO POR FAMILIA (Primeros 3 dígitos)
+            const famA = codA.substring(0, 3);
+            const famB = codB.substring(0, 3);
+            
+            if (famA !== famB) {
+                return famA.localeCompare(famB);
+            }
+
+            // 2. SI SON DE LA MISMA FAMILIA, APLICAR EL CRITERIO ELEGIDO
+            if (criterio === 'medio') {
+                const parteA = codA.split('-')[1] || "";
+                const parteB = codB.split('-')[1] || "";
+                return parteA.localeCompare(parteB);
+            } else if (criterio === 'final') {
+                const parteA = codA.slice(-4);
+                const parteB = codB.slice(-4);
+                return parteA.localeCompare(parteB);
+            } else {
+                return codA.localeCompare(codB);
+            }
+        });
+
+        const dataOrdenada = {};
+        entries.forEach(([key, value]) => {
+            dataOrdenada[key] = value;
+        });
+
+        displayData(dataOrdenada);
+    }
+
+    
+    function exportarInformePDF() {
+    if (!globalData || Object.keys(globalData).length === 0) {
+        alert("Sin datos para analizar."); return;
+    }
+
+    // 1. CAPTURA DE DATOS (IDs del index.html)
+    const excesos = document.getElementById("resumenExceso")?.innerText || "0";
+    const alertas = document.getElementById("resumenAlerta")?.innerText || "0";
+    const incidenciaRaw = document.getElementById("porcentajeAtencion")?.innerText || "0%";
+    const totalItems = document.getElementById("totalLineas")?.innerText || "0";
+    
+    const pCritico = document.getElementById("barExceso")?.innerText || "0%";
+    const pRiesgo = document.getElementById("barAlerta")?.innerText || "0%";
+    const pOptimo = document.getElementById("barNormal")?.innerText || "0%";
+    
+    const d = parseFloat(incidenciaRaw.replace('%', ''));
+
+    // 2. CONFIGURACIÓN DEL PDF Y PALETA MODERNA (Año 2026)
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    const maxLineWidth = pageWidth - (margin * 2);
+
+    // Colores modernos: Slate Dark para el encabezado, Crimson para el énfasis
+    const colorHeader = [30, 41, 59]; // Slate 800 (Elegante y serio)
+    const colorAccent = [225, 29, 72]; // Rose 600 (Para destacar necesidad sin ser "feo")
+
+    // 3. ENCABEZADO MINIMALISTA
+    doc.setFillColor(colorHeader[0], colorHeader[1], colorHeader[2]);
+    doc.rect(0, 0, pageWidth, 50, 'F');
+
+    // Logo con opacidad o filtro blanco (si aplica)
+    const logoImg = document.querySelector('.top-navbar img');
+    if (logoImg) { try { doc.addImage(logoImg, 'PNG', pageWidth - 35, 12, 20, 20); } catch(e){} }
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22); doc.setFont("helvetica", "bold");
+    doc.text("DATA-REPORT 2026", margin, 22);
+    
+    doc.setFontSize(10); doc.setFont("helvetica", "normal");
+    doc.setTextColor(200, 200, 200);
+    doc.text("GESTIÓN DE SUMINISTROS BASADA EN DEMANDA POBLACIONAL", margin, 30);
+    
+    doc.setFillColor(colorAccent[0], colorAccent[1], colorAccent[2]);
+    doc.rect(margin, 35, 40, 0.5, 'F'); // Línea de acento
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(9);
+    doc.text(`ID DE AUDITORÍA: ${Math.random().toString(36).substr(2, 9).toUpperCase()}`, margin, 42);
+    doc.text(`FECHA: ${new Date().toLocaleDateString()} | ${new Date().toLocaleTimeString()}`, margin + 50, 42);
+
+    // 4. BARRAS DE ESTADO REDISEÑADAS (Estilo "Pills")
+    let currentY = 65;
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(11); doc.setFont(undefined, 'bold');
+    doc.text("MÉTRICAS DE COBERTURA ACTUAL", margin, currentY);
+
+    currentY += 6;
+    const barHeight = 8;
+    const wCritico = (parseFloat(pCritico) || 0) / 100 * maxLineWidth;
+    const wRiesgo = (parseFloat(pRiesgo) || 0) / 100 * maxLineWidth;
+    const wOptimo = (parseFloat(pOptimo) || 0) / 100 * maxLineWidth;
+
+    // Fondo gris suave para la barra total
+    doc.setFillColor(241, 245, 249);
+    doc.rect(margin, currentY, maxLineWidth, barHeight, 'F');
+
+    doc.setFillColor(225, 29, 72); doc.rect(margin, currentY, wCritico, barHeight, 'F');
+    doc.setFillColor(245, 158, 11); doc.rect(margin + wCritico, currentY, wRiesgo, barHeight, 'F');
+    doc.setFillColor(16, 185, 129); doc.rect(margin + wCritico + wRiesgo, currentY, wOptimo, barHeight, 'F');
+
+    // Etiquetas de porcentaje modernas
+    doc.setFontSize(7); doc.setTextColor(71, 85, 105);
+    doc.text(`DÉFICIT CRÍTICO: ${pCritico}`, margin, currentY + 12);
+    doc.text(`BAJO MONITOREO: ${pRiesgo}`, margin + (maxLineWidth / 2), currentY + 12, { align: 'center' });
+    doc.text(`DISPONIBILIDAD ÓPTIMA: ${pOptimo}`, pageWidth - margin, currentY + 12, { align: 'right' });
+
+    // 5. HALLAZGOS TÉCNICOS
+    currentY += 25;
+    doc.setFontSize(11); doc.setTextColor(30, 41, 55); doc.setFont(undefined, 'bold');
+    doc.text("I. EVALUACIÓN DE LA DEMANDA CLÍNICA REAL", margin, currentY);
+    
+    currentY += 8;
+    doc.setFontSize(10); doc.setFont(undefined, 'normal');
+    const hallazgos = [
+        `• El análisis dinámico detecta que el ${incidenciaRaw} del inventario requiere expansión de techo presupuestario.`,
+        `• Se identifican ${excesos} códigos con ruptura de cuota por afluencia de pacientes superior a la proyectada.`,
+        `• La tendencia trimestral confirma que la asignación actual es insuficiente para cubrir el 100% de la demanda.`
+    ];
+
+    hallazgos.forEach(t => {
+        let lines = doc.splitTextToSize(t, maxLineWidth);
+        doc.text(lines, margin, currentY);
+        currentY += (lines.length * 5) + 3;
+    });
+
+    // 6. PROPUESTAS AMPLIADAS (Solicitadas)
+    currentY += 8;
+    doc.setFontSize(11); doc.setFont(undefined, 'bold');
+    doc.text("II. PLAN DE OPTIMIZACIÓN Y AMPLIACIÓN DE CUOTAS", margin, currentY);
+    
+    currentY += 8;
+    doc.setFontSize(10); doc.setFont(undefined, 'normal');
+    const propuestas = [
+        `1. ELEVACIÓN DE TECHOS: Implementar de inmediato el factor de seguridad 1.5 sobre los ${excesos} ítems con sobreconsumo para garantizar stock operativo de 45 días.`,
+        `2. ESCALABILIDAD DINÁMICA: Autorizar un margen de fluctuación del 20% adicional en los ${alertas} ítems identificados en 'Alerta', permitiendo una respuesta ágil ante picos de demanda poblacional.`,
+        `3. RECALIBRACIÓN TRIMESTRAL: Establecer un ciclo de ajuste automático basado en el promedio móvil de los últimos 3 meses, eliminando la brecha entre cuota fija y consumo real variable.`
+    ];
+
+    propuestas.forEach(t => {
+        let lines = doc.splitTextToSize(t, maxLineWidth);
+        doc.text(lines, margin, currentY);
+        currentY += (lines.length * 5) + 3;
+    });
+
+    // 7. FOOTER MODERNO CON DATOS DE AUTOR
+    const footerY = 260;
+    
+    // Separador HR
+    doc.setDrawColor(226, 232, 240);
+    doc.line(margin, footerY - 10, pageWidth - margin, footerY - 10);
+
+    // Fondo del Footer
+    doc.setFillColor(30, 41, 59);
+    doc.rect(0, footerY + 15, pageWidth, 22, 'F');
+
+    // Firmas
+    doc.setFontSize(8); doc.setFont(undefined, 'bold');
+    doc.text("RESPONSABLE TÉCNICO", margin, footerY);
+    doc.text("AUTORIZACIÓN DE DIRECCIÓN", pageWidth - margin, footerY, { align: 'right' });
+    
+    doc.setDrawColor(203, 213, 225);
+    doc.line(margin, footerY + 5, margin + 45, footerY + 5);
+    doc.line(pageWidth - margin - 45, footerY + 5, pageWidth - margin, footerY + 5);
+
+    // Mis Datos y Año
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(6);
+    doc.text("DISEÑO Y DESARROLLO POR JOSUE GONZALEZ BARRIOS", margin, footerY + 25);
+    doc.setFontSize(5);
+    doc.text("© 2026 | ANALIZADOR DE CUOTAS XML V2.0 | OPTIMIZADO PARA ENTORNOS DE SALUD", margin, footerY + 30);
+    
+    doc.text("PÁGINA 1 DE 1", pageWidth - margin, footerY + 28, { align: 'right' });
+
+    doc.save(`Reporte_Estrategico_2026_${d}pct.pdf`);
+}
 </script>
 </body>
 </html>
