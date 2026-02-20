@@ -262,35 +262,84 @@
         const avg = (r.m.reduce((a, b) => a + b, 0) / 3);
         const nec = (avg * 1.5).toFixed(2);
         const vigencia = avg > 0 ? (r.cuota / (avg / 30)).toFixed(0) : "∞";
-        const porcentaje = r.cuota > 0 ? ((avg / r.cuota) * 100).toFixed(1) : "0";
+        const porcentaje = ((avg / r.cuota) * 100).toFixed(1);
 
         const esAumento = avg > r.cuota;
         const colorClase = esAumento ? 'text-danger' : 'text-success';
         const tituloAccion = esAumento ? 'SOLICITUD DE AMPLIACIÓN DE CUOTA' : 'SOLICITUD DE REDUCCIÓN / AJUSTE DE CUOTA';
-        
-        const justificante = `${tituloAccion}\n\nPRODUCTO: ${r.product}\nID: ${code}\n\nI. ANTECEDENTES:\nCuota: ${r.cuota}. Consumos: ${r.m[0]}, ${r.m[1]}, ${r.m[2]}. Promedio: ${avg.toFixed(2)}.\n\nII. ANÁLISIS:\nUso: ${porcentaje}%. Cobertura: ${vigencia} días.\n\nIII. PROPUESTA:\nNueva cuota sugerida: ${nec} ${r.unit}.`;
+        const verboPropuesta = esAumento ? 'una ampliación' : 'un ajuste a la baja';
+        const riesgoTexto = esAumento 
+            ? `comprometiendo la continuidad del proceso por agotamiento temprano de la asignación.` 
+            : `detectándose un excedente de cuota que permite optimizar la asignación según la demanda real.`;
+
+        const justificante = `${tituloAccion}\n\n` +
+            `PRODUCTO: ${r.product}\n` +
+            `CÓDIGO DE IDENTIFICACIÓN: ${code}\n\n` +
+            `I. ANTECEDENTES:\n` +
+            `El producto cuenta con una cuota mensual de ${r.cuota} ${r.unit}. El análisis del último trimestre registra consumos de ${r.m[0]}, ${r.m[1]} y ${r.m[2]} unidades, resultando en un promedio mensual real de ${avg.toFixed(2)}.\n\n` +
+            `II. ANÁLISIS OPERATIVO:\n` +
+            `El consumo real representa el ${porcentaje}% de la cuota disponible. Bajo esta tendencia, la cobertura teórica es de ${vigencia} días mensuales, ${riesgoTexto}\n\n` +
+            `III. PROPUESTA TÉCNICA:\n` +
+            `Se requiere ${verboPropuesta} de la cuota basada en el factor de seguridad de 1.5 meses sobre el promedio real, estableciendo un nuevo requerimiento de ${nec} ${r.unit}.`;
 
         document.getElementById('modalBody').innerHTML = `
             <div class="report-section mb-3">
-                <h4 class="text-primary">${r.product}</h4>
-                <small>ID: <b>${code}</b> | Unidad: <b>${r.unit}</b></small>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">PRODUCTO SELECCIONADO</h6>
+                        <h4 class="text-primary mb-0">${r.product}</h4>
+                        <small>ID: <b>${code}</b> | Unidad: <b>${r.unit}</b></small>
+                    </div>
+                    <div class="text-right">
+                        <span class="badge ${esAumento ? 'badge-danger' : 'badge-success'} p-2" style="font-size:0.9rem">
+                            <i class="fas ${esAumento ? 'fa-arrow-up' : 'fa-arrow-down'}"></i> ${esAumento ? 'AUMENTAR' : 'REDUCIR'}
+                        </span>
+                    </div>
+                </div>
             </div>
+
             <div class="row mb-4">
-                <div class="col-md-3"><div class="modal-stat-card"><h6>CUOTA</h6><h4>${r.cuota}</h4></div></div>
-                <div class="col-md-3"><div class="modal-stat-card"><h6>PROM.</h6><h4>${avg.toFixed(2)}</h4></div></div>
-                <div class="col-md-3"><div class="modal-stat-card border-primary"><h6>NEC. 1.5</h6><h4 class="${colorClase}">${nec}</h4></div></div>
-                <div class="col-md-3"><div class="modal-stat-card"><h6>USO</h6><h4>${porcentaje}%</h4></div></div>
+                <div class="col-md-2 mb-2">
+                    <div class="modal-stat-card">
+                        <h6>CUOTA ACTUAL</h6>
+                        <h4>${r.cuota}</h4>
+                    </div>
+                </div>
+                <div class="col-md-2 mb-2">
+                    <div class="modal-stat-card">
+                        <h6>PROM. MENSUAL</h6>
+                        <h4>${avg.toFixed(2)}</h4>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <div class="modal-stat-card border-primary" style="background: #f0f7ff;">
+                        <h6>NUEVA NECESIDAD (1.5)</h6>
+                        <h4 class="${colorClase}">${nec}</h4>
+                    </div>
+                </div>
+                <div class="col-md-2 mb-2">
+                    <div class="modal-stat-card">
+                        <h6>VIGENCIA ACTUAL</h6>
+                        <h4>${vigencia} d</h4>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <div class="modal-stat-card">
+                        <h6>USO DE CUOTA</h6>
+                        <h4>${porcentaje}%</h4>
+                    </div>
+                </div>
             </div>
-            <div class="report-section bg-white border p-3">
-                <div class="d-flex justify-content-between mb-2">
-                    <h6 class="mb-0">JUSTIFICACIÓN TÉCNICA</h6>
-                    <button class="btn btn-sm btn-outline-primary" onclick="copyJ()">Copiar</button>
+
+            <div class="report-section bg-white border">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0"><i class="fas fa-file-alt"></i> JUSTIFICACIÓN TÉCNICA RECOMENDADA</h6>
+                    <button class="btn btn-sm btn-outline-primary" onclick="copyJ()"><i class="fas fa-copy"></i> Copiar Texto</button>
                 </div>
                 <div class="justificacion-box" id="jtext">${justificante}</div>
             </div>`;
         $('#gestionModal').modal('show');
     }
-
     function copyJ() { navigator.clipboard.writeText(document.getElementById('jtext').innerText); alert("Copiado."); }
 
     function exportToPDF() {
